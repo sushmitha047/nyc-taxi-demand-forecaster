@@ -10,7 +10,7 @@ def train_test_split(
 ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
     """
     """
-    df['pickup_hour'] = pd.to_datetime(df['pickup_hour']).dt.tz_localize(None)
+    df['pickup_hour'] = pd.to_datetime(df['pickup_hour']).dt.tz_convert('UTC')
 
     train_data = df[df.pickup_hour < cutoff_date].reset_index(drop=True)
     test_data = df[df.pickup_hour >= cutoff_date].reset_index(drop=True)
