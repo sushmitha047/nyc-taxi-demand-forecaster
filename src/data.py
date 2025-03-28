@@ -89,15 +89,19 @@ def load_raw_data(
         # append to existing data
         rides = pd.concat([rides, rides_one_month])
     
-    # keep only time and origin of the ride
-    rides = rides[['pickup_datetime', 'pickup_location_id']]
-
-    return rides
+    if rides.empty:
+        # no data, return empty dataframe
+        return pd.DataFrame()
+    else:
+        # keep only time and origin of the ride
+        rides = rides[['pickup_datetime', 'pickup_location_id']]
+        return rides
 
 
 # adding 0s whereever there are no rides at a given hour
 def add_missing_slots(rides: pd.DataFrame) -> pd.DataFrame:
-    location_ids = rides['pickup_location_id'].unique()
+    # location_ids = rides['pickup_location_id'].unique()
+    location_ids = range(1, rides['pickup_location_id'].max() + 1)
     full_range = pd.date_range(rides['pickup_hour'].min(),
                                rides['pickup_hour'].max(),
                                freq='h')
@@ -107,6 +111,13 @@ def add_missing_slots(rides: pd.DataFrame) -> pd.DataFrame:
 
         # keep only rides for this `location_id`
         rides_i = rides.loc[rides.pickup_location_id == location_id, ['pickup_hour', 'rides']]
+
+        if rides_i.empty:
+            # no rides for this location, add a dummy entry with 0 rides
+            rides_i = pd.DataFrame.from_dict([{
+                'pickup_hour': rides['pickup_hour'].max(),
+                'rides': 0
+            }])
 
         # quick way to add missing dates with 0 in a series
         rides_i.set_index('pickup_hour', inplace=True)
@@ -203,7 +214,7 @@ def transform_ts_data_into_features_and_target(
         pickup_hours = []
         for i, idx in enumerate(indices):
             x[i, :] = ts_data_one_location.iloc[idx[0]:idx[1]]['rides'].values
-            y[i] = ts_data_one_location.iloc[idx[1]:idx[2]]['rides'].values.item()
+            y[i] = ts_data_one_location.iloc[idx[1]:idx[2]]['rides'].values[0]
             pickup_hours.append(ts_data_one_location.iloc[idx[1]]['pickup_hour'])
 
         # features: numpy array -> pandas dataframe
@@ -228,4 +239,3 @@ def transform_ts_data_into_features_and_target(
     targets.reset_index(inplace=True, drop=True)
 
     return features, targets['target_rides_next_hour']
-     
