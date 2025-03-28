@@ -13,7 +13,11 @@ def plot_one_sample(
 ):
     """"""
     features_ = features.iloc[example_id]
-    targets_ = targets.iloc[example_id]
+
+    if targets is not None:
+        targets_ = targets.iloc[example_id]
+    else:
+        targets_ = None
 
     ts_columns = [c for c in features.columns if c.startswith('rides_previous_')]
     ts_values = [features_[c] for c in ts_columns] + [targets_]
@@ -23,18 +27,28 @@ def plot_one_sample(
         freq='h'
     )
 
+
+    pick_hour_formatted = features_['pickup_hour'].strftime('%Y-%m-%d %H:%M:%S')
+
     # line plot with past values
-    title = f'Pick up hour={features_['pickup_hour']}, location_id={features_['pickup_location_id']}' if display_title else None
+    title = f'Pick up hour={pick_hour_formatted}, location_id={features_['pickup_location_id']}' if display_title else None
     fig = px.line(
         x=ts_dates, y=ts_values,
         template='plotly_dark',
         markers=True, title=title
     )
 
-    # green dot for the value we want to predict
-    fig.add_scatter(x=ts_dates[-1:], y=[targets_],
-                    line_color='green',
-                    mode='markers', marker_size=10, name='actual value')
+    # Update axis labels
+    fig.update_layout(
+        xaxis_title='Date',
+        yaxis_title='Rides'
+    )
+
+    if targets is not None:
+        # green dot for the value we want to predict
+        fig.add_scatter(x=ts_dates[-1:], y=[targets_],
+                        line_color='green',
+                        mode='markers', marker_size=10, name='Actual Rides')
     
     if predictions is not None:
         # big red X for the prediction value, if passed
@@ -44,6 +58,6 @@ def plot_one_sample(
                         mode='markers',
                         marker_symbol='x',
                         marker_size=15,
-                        name='prediction')
+                        name='Predicted Rides')
     
     return fig
