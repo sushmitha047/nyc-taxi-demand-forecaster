@@ -54,6 +54,26 @@ def load_batch_of_features_from_store(
 
     ts_data = ts_data[ts_data.pickup_hour.between(fetch_data_from, fetch_data_to)]
 
+    # #--------New logic to filter for locations with complete data--------#
+    # location_ids_with_data = ts_data['pickup_location_id'].unique()
+
+    # #keep only locations with complete data
+    # location_ids_to_keep = []
+    # for loc_id in location_ids_with_data:
+    #     loc_data = ts_data[ts_data['pickup_location_id'] == loc_id]
+    #     if len(loc_data) == n_features:
+    #         location_ids_to_keep.append(loc_id)
+
+    # print(f"Found {len(location_ids_to_keep)}/{len(location_ids_with_data)} locations with complete data.")
+
+    # if not location_ids_to_keep:
+    #     raise ValueError("No locations have complete data for predictions")
+
+    # location_ids = location_ids_to_keep
+    # ts_data = ts_data[ts_data.pickup_location_id.isin(location_ids)]
+    # #--------------New logic ends----------------#
+
+
     # validate we are not missing data in the feature store 
     location_ids = ts_data['pickup_location_id'].unique()
     assert len(ts_data) == n_features*len(location_ids), "Time-series data is not complete"

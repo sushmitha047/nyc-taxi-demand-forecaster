@@ -10,6 +10,7 @@ def plot_one_sample(
         example_id: int, # row number
         predictions: Optional[pd.Series] = None,
         display_title: Optional[bool] = True,
+        location_id_to_zone: Optional[dict] = None, # for mapping location_id to location name
 ):
     """"""
     features_ = features.iloc[example_id]
@@ -30,8 +31,11 @@ def plot_one_sample(
 
     pick_hour_formatted = features_['pickup_hour'].strftime('%Y-%m-%d %H:%M:%S')
 
+    pickup_location_id = features_['pickup_location_id']
+    zone_name = location_id_to_zone.get(pickup_location_id, str(pickup_location_id)) if location_id_to_zone else str(pickup_location_id)
+
     # line plot with past values
-    title = f'Pick up hour={pick_hour_formatted}, location_id={features_['pickup_location_id']}' if display_title else None
+    title = f'Pick up hour={pick_hour_formatted}, location =[{pickup_location_id}] {zone_name}' if display_title else None
     fig = px.line(
         x=ts_dates, y=ts_values,
         template='plotly_dark',

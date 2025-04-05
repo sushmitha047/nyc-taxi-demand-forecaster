@@ -60,6 +60,8 @@ with st.spinner(text="Downloading shape file to plot taxi zones"):
     st.sidebar.write(":white_check_mark: Shape file was downloaded")
     progress_bar.progress(1/N_STEPS)
 
+# Dictionary to map location_ids to zone names for display purposes
+location_id_to_zone = dict(zip(geo_df['LocationID'], geo_df['zone']))
 
 # connecting to feature store to access data
 with st.spinner(text="Fetching batch of inference data"):
@@ -100,7 +102,7 @@ with st.spinner(text="Generating NYC Map"):
 
     INITIAL_VIEW_STATE = pdk.ViewState(
         latitude=40.7831,
-        longitude=73.9712,
+        longitude=-73.9712,
         zoom=11,
         max_zoom=16,
         pitch=45,
@@ -145,7 +147,8 @@ with st.spinner(text="Plotting time-series data"):
             features=features,
             targets=results['predicted_demand'],
             example_id=row_id,
-            predictions=pd.Series(results['predicted_demand'])
+            predictions=pd.Series(results['predicted_demand']),
+            location_id_to_zone=location_id_to_zone # for mapping location_id to location name
         )
         st.plotly_chart(fig, theme="streamlit", use_container_width=True, width=100)
 
