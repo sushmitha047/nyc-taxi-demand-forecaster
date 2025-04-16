@@ -11,10 +11,12 @@ import geopandas as gpd
 import pydeck as pdk
 
 from src.inference import (
+    load_predictions_from_store,
     load_batch_of_features_from_store,
     load_model_from_registry,
     get_model_predictions
 )
+
 from src.paths import DATA_DIR
 from src.plot import plot_one_sample
 
@@ -54,48 +56,99 @@ def load_shape_data_file():
     # load and return shape file
     return gpd.read_file(DATA_DIR / "taxi_zones/taxi_zones.shp").to_crs("epsg:4326")
 
+# load batch of features from the feature store wrapped in a function to cache the data to avoid multiple calls to the feature store
+@st.cache_data
+def _load_batch_of_features_from_store(current_date: datetime) -> pd.DataFrame:
+    """Wrapped function to cache the batch of features, similar to the original function load_batch_of_features_from_store
+
+    Args: 
+        current_date (datetime): datetime of the prediction for which we want to get the batch of features
+
+    Returns:
+        pd.DataFrame: n_features + 2 columns:
+            - `rides_previous_N_hour`
+            - `rides_previous_{N-1}_hour`
+            - `rides_previous_{N-2}_hour`
+            - ...
+            - `rides_previous_1_hour`
+            - `pickup_hour`
+            - `pickup_location_id`
+
+    """
+    return load_batch_of_features_from_store(current_date)
+
+# load predictions from the feature store wrapped in a function to cache the data to avoid multiple calls to the feature store
+@st.cache_data
+def _load_predictions_from_store(
+    from_pickup_hour: datetime,
+    to_pickup_hour: datetime
+) -> pd.DataFrame:
+    """Wrapped function to cache the predictions, similar to the original function load_predictions_from_store
+
+    Args:
+        from_pickup_hour (datetime): min datetime of the prediction for which we want to get the batch of features
+        to_pickup_hour (datetime): max datetime of the prediction for which we want to get the batch of features
+
+    Returns:
+        pd.DataFrame: 2 columns:
+            - `pickup_location_id`
+            - `predicted_demand`
+
+    """
+    return load_predictions_from_store(from_pickup_hour, to_pickup_hour)
+
 
 with st.spinner(text="Downloading shape file to plot taxi zones"):
     geo_df = load_shape_data_file()
     st.sidebar.write(":white_check_mark: Shape file was downloaded")
     progress_bar.progress(1/N_STEPS)
 
-# Dictionary to map location_ids to zone names for display purposes
-location_id_to_zone = dict(zip(geo_df['LocationID'], geo_df['zone']))
-
-# connecting to feature store to access data
-with st.spinner(text="Fetching batch of inference data"):
-    features = load_batch_of_features_from_store(current_date)
-    st.sidebar.write(":white_check_mark: Inference features fetched from the store")
+with st.spinner(text="Fetching model predictions from the store"):
+    predictions_df = _load_predictions_from_store(
+        from_pickup_hour=current_date - pd.Timedelta(hours=1),
+        to_pickup_hour=current_date
+    )
+    st.sidebar.write(":white_check_mark: Model predictions fetched from the store")
     progress_bar.progress(2/N_STEPS)
-    print(f"{features}")
 
-# loading model from model registry
-with st.spinner(text="Loading ML model from the registry"):
-    model = load_model_from_registry()
-    st.sidebar.write(":white_check_mark: ML model was loaded from the registry")
-    progress_bar.progress(3/N_STEPS)
+# Here we are checking the predictions for the current hour have already been computed and are available
+next_hour_predictions_ready = \
+    False if predictions_df[predictions_df.pickup_hour == current_date].empty else True
+prev_hour_predictions_ready = \
+    False if predictions_df[predictions_df.pickup_hour == (current_date - pd.Timedelta(hours=1))].empty else True
 
-# generate predictions
-with st.spinner(text="Computing Model Predictions"):
-    results = get_model_predictions(model, features)
-    st.sidebar.write(":white_check_mark: Model predictions arrived")
-    progress_bar.progress(4/N_STEPS)
+if next_hour_predictions_ready:
+    # predictions for the current hour are available
+    predictions_df = predictions_df[predictions_df.pickup_hour == current_date]
+elif prev_hour_predictions_ready:
+    # predictions for the current hour are not available yet, so we use the predictions for the previous hour
+    predictions_df = predictions_df[predictions_df.pickup_hour == (current_date - pd.Timedelta(hours=1))]
+    st.subheader(f"The most recent data is not yet available. Using the last hour predictions instead.")
+else:
+    raise Exception('Features are not available for the last 2 hours. Checking feature pipeline...')
 
-# preparing data to plot
 with st.spinner(text="Preparing data to plot"):
 
     def psuedocolor(val, minval, maxval, startcolor, stopcolor):
+        """Converts a value to a color based on the min and max values
+        minval...maxval to startcolor...stopcolor"""
         f = float(val - minval) / (maxval - minval)
         return tuple(f*(b-a)+a for (a,b) in zip(startcolor, stopcolor))
     
-    df = pd.merge(geo_df, results, right_on="pickup_location_id", left_on="LocationID")
-
+    df = pd.merge(
+        geo_df,
+        predictions_df,
+        right_on="pickup_location_id",
+        left_on="LocationID",
+        how='inner'
+    )
+    
     BLACK, GREEN = (0, 0, 0), (0, 255, 0)
     df['color_scaling'] = df['predicted_demand']
-    max_pred, min_pred = df['color_scaling'].max(), df['color_scaling'].min()
+    max_pred, min_pred = df["color_scaling"].max(), df["color_scaling"].min()
     df['fill_color'] = df["color_scaling"].apply(lambda x: psuedocolor(x, min_pred, max_pred, BLACK, GREEN))
-    progress_bar.progress(5/N_STEPS)
+    progress_bar.progress(3/N_STEPS)
+
 
 # NYC map
 with st.spinner(text="Generating NYC Map"):
@@ -133,23 +186,101 @@ with st.spinner(text="Generating NYC Map"):
     )
 
     st.pydeck_chart(r)
-    progress_bar.progress(6/N_STEPS)
+    progress_bar.progress(4/N_STEPS)
 
+# Dictionary to map location_ids to zone names for display purposes
+location_id_to_zone = dict(zip(geo_df['LocationID'], geo_df['zone']))
+
+# # connecting to feature store to access data
+# with st.spinner(text="Fetching batch of inference data"):
+#     features = load_batch_of_features_from_store(current_date)
+#     st.sidebar.write(":white_check_mark: Inference features fetched from the store")
+#     progress_bar.progress(5/N_STEPS)
+#     print(f"{features}")
+
+# connecting to feature store to access data
+with st.spinner(text="Fetching batch of inference data"):
+    features_df = _load_batch_of_features_from_store(current_date)
+    st.sidebar.write(":white_check_mark: Inference features fetched from the store")
+    progress_bar.progress(5/N_STEPS)
+    print(f"{features_df}")
 
 # plotting timeseries plot
 with st.spinner(text="Plotting time-series data"):
-    row_indices = np.argsort(results['predicted_demand'].values)[::-1]
+
+    predictions_df = df
+
+    row_indices = np.argsort(predictions_df['predicted_demand'].values)[::-1]
     n_to_plot = 10
 
     # plot each time-series with the prediction
     for row_id in row_indices[:n_to_plot]:
+
+        #title
+        location_id = predictions_df['pickup_location_id'].iloc[row_id]
+        location_name = predictions_df['zone'].iloc[row_id]
+        st.header(f'Location ID: {location_id} - {location_name}')
+
+        # plot predictions
+        prediction = predictions_df['predicted_demand'].iloc[row_id]
+        st.metric(label="Predicted demand", value=int(prediction))
+
+        # plot figure
+        # generate figure
         fig = plot_one_sample(
-            features=features,
-            targets=results['predicted_demand'],
             example_id=row_id,
-            predictions=pd.Series(results['predicted_demand']),
-            location_id_to_zone=location_id_to_zone # for mapping location_id to location name
+            features=features_df,
+            targets=predictions_df["predicted_demand"],
+            predictions=pd.Series(predictions_df["predicted_demand"]),
+            display_title=False,
         )
         st.plotly_chart(fig, theme="streamlit", use_container_width=True, width=100)
+    progress_bar.progress(6/N_STEPS)
 
-    progress_bar.progress(7/N_STEPS)
+# # loading model from model registry
+# with st.spinner(text="Loading ML model from the registry"):
+#     model = load_model_from_registry()
+#     st.sidebar.write(":white_check_mark: ML model was loaded from the registry")
+#     progress_bar.progress(3/N_STEPS)
+
+# # generate predictions
+# with st.spinner(text="Computing Model Predictions"):
+#     results = get_model_predictions(model, features)
+#     st.sidebar.write(":white_check_mark: Model predictions arrived")
+#     progress_bar.progress(4/N_STEPS)
+
+# # preparing data to plot
+# with st.spinner(text="Preparing data to plot"):
+
+#     def psuedocolor(val, minval, maxval, startcolor, stopcolor):
+#         f = float(val - minval) / (maxval - minval)
+#         return tuple(f*(b-a)+a for (a,b) in zip(startcolor, stopcolor))
+    
+#     df = pd.merge(geo_df, results, right_on="pickup_location_id", left_on="LocationID")
+
+#     BLACK, GREEN = (0, 0, 0), (0, 255, 0)
+#     df['color_scaling'] = df['predicted_demand']
+#     max_pred, min_pred = df['color_scaling'].max(), df['color_scaling'].min()
+#     df['fill_color'] = df["color_scaling"].apply(lambda x: psuedocolor(x, min_pred, max_pred, BLACK, GREEN))
+#     progress_bar.progress(5/N_STEPS)
+
+
+
+
+# # plotting timeseries plot
+# with st.spinner(text="Plotting time-series data"):
+#     row_indices = np.argsort(results['predicted_demand'].values)[::-1]
+#     n_to_plot = 10
+
+#     # plot each time-series with the prediction
+#     for row_id in row_indices[:n_to_plot]:
+#         fig = plot_one_sample(
+#             features=features,
+#             targets=results['predicted_demand'],
+#             example_id=row_id,
+#             predictions=pd.Series(results['predicted_demand']),
+#             location_id_to_zone=location_id_to_zone # for mapping location_id to location name
+#         )
+#         st.plotly_chart(fig, theme="streamlit", use_container_width=True, width=100)
+
+#     progress_bar.progress(7/N_STEPS)
