@@ -14,8 +14,10 @@ except:
     raise Exception("Create an .env file on the project root with the HOPSWORKS_API_KEY")
 
 
-FEATURE_GROUP_NAME = "time_series_hourly_feature_group"
-FEATURE_GROUP_VERSION = 1
+# FEATURE_GROUP_NAME = "time_series_hourly_feature_group"
+# FEATURE_GROUP_VERSION = 1
+
+# Feature Group Metadata for writing timeseries data to the Feature Store
 FEATURE_GROUP_METADATA = FeatureGroupConfig(
     name='time_series_hourly_feature_group',
     version=1,
@@ -25,15 +27,41 @@ FEATURE_GROUP_METADATA = FeatureGroupConfig(
     online_enabled=True,
 )
 
-FEATURE_VIEW_NAME = "time_series_hourly_feature_view"
-FEATURE_VIEW_VERSION = 1
+# FEATURE_VIEW_NAME = "time_series_hourly_feature_view"
+# FEATURE_VIEW_VERSION = 1
+
+# Feature View Metadata for reading timeseries data from the Feature Store
 FEATURE_VIEW_METADATA = FeatureViewConfig(
     name='time_series_hourly_feature_view',
     version=1,
     feature_group=FEATURE_GROUP_METADATA,
 )
 
+# Feature Group Metadata for writing model predictions to the Feature Store
+FEATURE_GROUP_PREDICTIONS_METADATA = FeatureGroupConfig(
+    name='model_predictions_feature_group',
+    version=1,
+    description='Feature group with model predictions',
+    primary_key=['pickup_location_id', 'pickup_ts'],
+    event_time='pickup_ts',
+    online_enabled=True,
+)
+
+# Feature View Metadata for reading model predictions from the Feature Store
+FEATURE_VIEW_PREDICTIONS_METADATA = FeatureViewConfig(
+    name='model_predictions_feature_view',
+    version=1,
+    feature_group=FEATURE_GROUP_PREDICTIONS_METADATA,
+)
+
+# Feature View Metadata for monitoring model predictions and actuals
+MONITORING_FV_NAME = 'monitoring_feature_view'
+MONITORING_FV_VERSION = 1
+
 N_FEATURES = 24 * 28
 
 MODEL_NAME = "taxi_demand_forecaster_next_hour"
 MODEL_VERSION = 1
+
+# maximum Mean Absolute Error we allow our production model to have
+MAX_MAE = 30.0
