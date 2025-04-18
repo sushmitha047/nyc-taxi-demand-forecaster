@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta
 
 import hopsworks
-from hsfs.feature_store import FeatureStore
+# from hsfs.feature_store import FeatureStore
 import pandas as pd
 import numpy as np
 
 import src.config as config
+from src.feature_store_api import get_feature_store, get_or_create_feature_view
+from src.config import FEATURE_VIEW_METADATA
 
 def get_hopsworks_project() -> hopsworks.project.Project:
 
@@ -14,9 +16,9 @@ def get_hopsworks_project() -> hopsworks.project.Project:
         api_key_value=config.HOPSWORKS_API_KEY
     )
 
-def get_feature_store() -> FeatureStore:
-    project = get_hopsworks_project()
-    return project.get_feature_store()
+# def get_feature_store() -> FeatureStore:
+#     project = get_hopsworks_project()
+#     return project.get_feature_store()
 
 def get_model_predictions(model, features: pd.DataFrame) -> pd.DataFrame:
 
@@ -68,13 +70,15 @@ def load_batch_of_features_from_store(
     """
     n_features = config.N_FEATURES
 
-    feature_store = get_feature_store()
+    # feature_store = get_feature_store()
     
 
-    feature_view = feature_store.get_feature_view(
-        name=config.FEATURE_VIEW_NAME,
-        version=config.FEATURE_GROUP_VERSION
-    )
+    # feature_view = feature_store.get_feature_view(
+    #     name=config.FEATURE_VIEW_NAME,
+    #     version=config.FEATURE_GROUP_VERSION
+    # )
+
+    feature_view = get_or_create_feature_view(FEATURE_VIEW_METADATA)
 
     # fetch data from the feature store
     fetch_data_from = current_date - timedelta(days=28)
