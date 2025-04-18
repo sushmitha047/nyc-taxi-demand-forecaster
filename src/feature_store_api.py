@@ -7,15 +7,16 @@ import hopsworks
 import src.config as config
 from src.logger import get_logger
 
+
 logger = get_logger()
 
 @dataclass
 class FeatureGroupConfig:
     name: str
     version: int
-    description: str
-    primary_key: List[str]
-    event_time: str
+    description: str = None
+    primary_key: List[str] = None
+    event_time: str = None
     online_enabled: Optional[bool] = False
 
 @dataclass
@@ -23,6 +24,7 @@ class FeatureViewConfig:
     name: str
     version: int
     feature_group: FeatureGroupConfig
+
 
 def get_feature_store() -> hsfs.feature_store.FeatureStore:
     """Connects to Hopsworks and returns a pointer to the feature store
@@ -36,20 +38,20 @@ def get_feature_store() -> hsfs.feature_store.FeatureStore:
     )
     return project.get_feature_store()
 
-
 def get_or_create_feature_group(
-    feature_group_metadata: FeatureGroupConfig
+        feature_group_metadata: FeatureGroupConfig
 ) -> hsfs.feature_group.FeatureGroup:
-    """Connects to the feature store and returns a pointer to the given
-    feature group `name`
+    """
+    Connects to the feature store and returns a pointer to the given feature group 'name
 
     Args:
         name (str): name of the feature group
-        version (Optional[int], optional): _description_. Defaults to 1.
+        ersion (Optional[int], optional): _description_. Defaults to 1.
 
     Returns:
         hsfs.feature_group.FeatureGroup: pointer to the feature group
     """
+
     return get_feature_store().get_or_create_feature_group(
         name=feature_group_metadata.name,
         version=feature_group_metadata.version,
