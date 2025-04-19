@@ -14,8 +14,8 @@ except:
     raise Exception("Create an .env file on the project root with the HOPSWORKS_API_KEY")
 
 
-# FEATURE_GROUP_NAME = "time_series_hourly_feature_group"
-# FEATURE_GROUP_VERSION = 1
+FEATURE_GROUP_NAME = "time_series_hourly_feature_group"
+FEATURE_GROUP_VERSION = 1
 
 # Feature Group Metadata for writing timeseries data to the Feature Store
 FEATURE_GROUP_METADATA = FeatureGroupConfig(
