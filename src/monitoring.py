@@ -39,9 +39,14 @@ def load_predictions_and_actual_values_from_store(
     # query to join the 2 features groups by `pickup_hour` and `pickup_location_id`
     from_ts = int(from_date.timestamp() * 1000)
     to_ts = int(to_date.timestamp() * 1000)
+    # query = predictions_fg.select_all() \
+    #     .join(actuals_fg.select(['pickup_location_id', 'pickup_ts', 'time_series_hourly_feature_group_rides']),
+    #           on=['pickup_ts', 'pickup_location_id'], prefix=None) \
+    #     .filter(predictions_fg.pickup_ts >= from_ts) \
+    #     .filter(predictions_fg.pickup_ts <= to_ts)
     query = predictions_fg.select_all() \
-        .join(actuals_fg.select(['pickup_location_id', 'pickup_ts', 'rides']),
-              on=['pickup_ts', 'pickup_location_id'], prefix=None) \
+        .join(actuals_fg.select_all(),
+                on=['pickup_ts', 'pickup_location_id'], prefix=None) \
         .filter(predictions_fg.pickup_ts >= from_ts) \
         .filter(predictions_fg.pickup_ts <= to_ts)
     
@@ -80,17 +85,17 @@ def load_predictions_and_actual_values_from_store(
 
     return monitoring_df
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
 
-    # parse command line arguments
-    parser = ArgumentParser()
-    parser.add_argument('--from_date',
-                        type=lambda s: datetime.strptime(s, '%Y-%m-%d %H:%M:%S'),
-                        help='Datetime argument in the format of YYYY-MM-DD HH:MM:SS')
-    parser.add_argument('--to_date',
-                        type=lambda s: datetime.strptime(s, '%Y-%m-%d %H:%M:%S'),
-                        help='Datetime argument in the format of YYYY-MM-DD HH:MM:SS')
-    args = parser.parse_args()
+#     # parse command line arguments
+#     parser = ArgumentParser()
+#     parser.add_argument('--from_date',
+#                         type=lambda s: datetime.strptime(s, '%Y-%m-%d %H:%M:%S'),
+#                         help='Datetime argument in the format of YYYY-MM-DD HH:MM:SS')
+#     parser.add_argument('--to_date',
+#                         type=lambda s: datetime.strptime(s, '%Y-%m-%d %H:%M:%S'),
+#                         help='Datetime argument in the format of YYYY-MM-DD HH:MM:SS')
+#     args = parser.parse_args()
 
 
-    monitoring_df = load_predictions_and_actual_values_from_store()
+#     monitoring_df = load_predictions_and_actual_values_from_store()

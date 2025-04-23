@@ -11,7 +11,8 @@ from src.monitoring import load_predictions_and_actual_values_from_store
 st.set_page_config(layout="wide")
 
 # title
-current_date = pd.to_datetime(datetime.utcnow(), utc=True).floor('H')
+current_date = pd.to_datetime(datetime.utcnow()).floor('H')
+print(f"Current date: {current_date}")
 st.title(f'Monitoring dashboard 🔎')
 
 progress_bar = st.sidebar.header('⚙️ Working Progress')
@@ -19,7 +20,7 @@ progress_bar = st.sidebar.progress(0)
 N_STEPS = 3
 
 
-# @st.cache_data
+@st.cache_data
 def _load_predictions_and_actuals_from_store(
     from_date: datetime,
     to_date: datetime
@@ -46,8 +47,8 @@ def _load_predictions_and_actuals_from_store(
 with st.spinner(text="Fetching model predictions and actual values from the store"):
     
     monitoring_df = _load_predictions_and_actuals_from_store(
-        from_date=current_date - timedelta(days=14),
-        to_date=current_date
+        from_date = current_date - timedelta(days=14),
+        to_date = current_date
     )
     st.sidebar.write('✅ Model predictions and actual values arrived')
     progress_bar.progress(1/N_STEPS)
@@ -63,7 +64,7 @@ with st.spinner(text="Plotting aggregate MAE hour-by-hour"):
     mae_per_hour = (
         monitoring_df
         .groupby('pickup_hour')
-        .apply(lambda g: mean_absolute_error(g['rides'], g['predicted_demand']))
+        .apply(lambda g: mean_absolute_error(g['time_series_hourly_feature_group_rides'], g['predicted_demand']))
         .reset_index()
         .rename(columns={0: 'mae'})
         .sort_values(by='pickup_hour')
@@ -85,7 +86,7 @@ with st.spinner(text="Plotting MAE hour-by-hour for top locations"):
 
     top_locations_by_demand = (
         monitoring_df
-        .groupby('pickup_location_id')['rides']
+        .groupby('pickup_location_id')['time_series_hourly_feature_group_rides']
         .sum()
         .sort_values(ascending=False)
         .reset_index()
@@ -97,7 +98,7 @@ with st.spinner(text="Plotting MAE hour-by-hour for top locations"):
         mae_per_hour = (
             monitoring_df[monitoring_df.pickup_location_id == location_id]
             .groupby('pickup_hour')
-            .apply(lambda g: mean_absolute_error(g['rides'], g['predicted_demand']))
+            .apply(lambda g: mean_absolute_error(g['time_series_hourly_feature_group_rides'], g['predicted_demand']))
             .reset_index()
             .rename(columns={0: 'mae'})
             .sort_values(by='pickup_hour')
@@ -109,6 +110,6 @@ with st.spinner(text="Plotting MAE hour-by-hour for top locations"):
             template='plotly_dark',
         )
         st.subheader(f'{location_id=}')
-        st.plotly_chart(fig, theme="streamlit", use_container_width=True, width=1000)
+        st.plotly_chart(fig, theme="streamlit", use_container_width=True, width=1000, key=f"mae_plot_{location_id}")
 
     progress_bar.progress(3/N_STEPS)
